@@ -72,6 +72,17 @@ td.lo{color:var(--bad);font-weight:700}
 .tv.lo{color:var(--bad)}
 .fx{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .fx input{flex:1;min-width:150px}
+button.warn{background:var(--warn);color:#111}
+.req{border-color:var(--warn)!important;background:color-mix(in srgb,var(--warn) 18%,var(--bg))!important;box-shadow:0 0 0 2px var(--warn)}
+.tv.req{border-radius:6px;padding:2px 4px}
+.tb{width:96px;font-variant-numeric:tabular-nums}
+#tp{z-index:40}
+.dg.tp{max-width:320px;margin:14vh auto 0}
+.wl{display:flex;position:relative;height:200px}
+.wc{flex:1;overflow-y:auto;scroll-snap-type:y mandatory;padding:80px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.wc::-webkit-scrollbar{display:none}
+.wc div{height:40px;line-height:40px;text-align:center;font-size:1.35rem;scroll-snap-align:center;font-variant-numeric:tabular-nums}
+.wb{position:absolute;left:0;right:0;top:80px;height:40px;border-top:2px solid var(--ac);border-bottom:2px solid var(--ac);pointer-events:none}
 .rc.low .fixr input[data-f="fix"]{border-color:var(--bad)}
 .dg{max-width:440px;margin:12vh auto 0;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px}
 .dg h3{margin:0 0 8px}
@@ -131,6 +142,8 @@ body.one .wk:not(.pw){display:none!important}
 
 <div class="ov" id="dg"><div class="dg"><h3 id="dgt"></h3><div id="dgb"></div><div class="f" id="dgf"></div></div></div>
 
+<div class="ov" id="tp"><div class="dg tp"><h3 id="tpt"></h3><div class="wl"><div class="wc" id="wh"></div><div class="wc" id="wm"></div><div class="wb"></div></div><div class="f"><button class="x" id="tpn">Teď</button><button class="x" id="tpc">Zrušit</button><button id="tpo">Hotovo</button></div></div></div>
+
 <script>
 const $=id=>document.getElementById(id);
 const KEY='temperatureApp_state';
@@ -157,7 +170,7 @@ const fv=v=>v==null||v===''?'':v;
 function dlg(title,html,btns){
  $('dgt').textContent=title;$('dgb').innerHTML=html;
  const f=$('dgf');f.innerHTML='';
- btns.forEach(b=>{const e=document.createElement('button');e.textContent=b.t;if(!b.p)e.className='x';e.onclick=()=>{$('dg').classList.remove('on');if(b.f)b.f()};f.appendChild(e)});
+ btns.forEach(b=>{const e=document.createElement('button');e.textContent=b.t;e.className=b.c||(b.p?'':'x');e.onclick=()=>{$('dg').classList.remove('on');if(b.f)b.f()};f.appendChild(e)});
  $('dg').classList.add('on');
 }
 
@@ -282,7 +295,7 @@ function openDay(k){
 function closeSheet(){$('sh').classList.remove('on');A=null}
 function meas(r,i,k){
  const t=r['t'+k],c=r['c'+k],u=c==null;
- return '<div class="ms"><div class="mt"><b>'+(k===2?'Čas 2':'Čas')+'</b><input inputmode="numeric" maxlength="5" placeholder="--:--" data-f="t'+k+'" data-r="'+i+'" value="'+esc(t)+'"><button class="x" data-a="now" data-r="'+i+'" data-k="'+k+'">Teď</button></div>'+
+ return '<div class="ms"><div class="mt"><b>'+(k===2?'Čas 2':'Čas')+'</b><button class="x tb" data-a="tp" data-f="t'+k+'" data-r="'+i+'" data-k="'+k+'">'+esc(t||'--:--')+'</button><button class="x" data-a="now" data-r="'+i+'" data-k="'+k+'">Teď</button></div>'+
  '<div class="mc"><input type="range" class="'+(u?'un':'')+'" min="60" max="90" value="'+(u?S.defTemp:c)+'" data-f="c'+k+'" data-r="'+i+'"><button class="x" data-a="adj" data-v="-1" data-r="'+i+'" data-k="'+k+'">−</button><b class="tv'+(!u&&c<S.limit?' lo':'')+'" id="tv'+k+'_'+i+'">'+(u?'–':c+' °C')+'</b><button class="x" data-a="adj" data-v="1" data-r="'+i+'" data-k="'+k+'">+</button></div></div>';
 }
 function rowHtml(r,i){
@@ -298,14 +311,14 @@ function renderSheet(){
  let h='<label>Jméno odpovědné osoby</label><select data-f="staff"><option value="">– vyberte jméno –</option>'+names.map(n=>'<option'+(n===A.staff?' selected':'')+'>'+esc(n)+'</option>').join('')+'</select>';
  A.rows.forEach((r,i)=>h+=rowHtml(r,i));
  h+='<div class="fx"><button class="x" data-a="add">+ Přidat jídlo</button><button class="x" data-a="yest">Jídla ze včerejška</button></div>';
- $('sb').innerHTML=h;$('sb').scrollTop=sc;
+ $('sb').innerHTML=h;$('sb').scrollTop=sc;hl();
 }
 const q=(i,f)=>$('sb').querySelector('[data-f="'+f+'"][data-r="'+i+'"]');
 function setC(i,k,v){
  const r=A.rows[i];r['c'+k]=v;
  const s=q(i,'c'+k);s.value=v;s.classList.remove('un');
  const t=$('tv'+k+'_'+i);t.textContent=v+' °C';t.classList.toggle('lo',v<S.limit);
- $('rc'+i).classList.toggle('low',lowAny(r));
+ $('rc'+i).classList.toggle('low',lowAny(r));hl();
 }
 $('sb').addEventListener('click',e=>{
  const pk=e.target.closest('[data-pick]');
@@ -314,9 +327,10 @@ $('sb').addEventListener('click',e=>{
  const a=b.dataset.a,i=+b.dataset.r,k=b.dataset.k;
  if(a==='add'){A.rows.push(newRow());renderSheet()}
  else if(a==='del'){A.rows.splice(i,1);if(!A.rows.length)A.rows.push(newRow());renderSheet()}
- else if(a==='now'){const v=nowT();A.rows[i]['t'+k]=v;q(i,'t'+k).value=v}
+ else if(a==='tp'){openTp(i,k)}
+ else if(a==='now'){const v=nowT();A.rows[i]['t'+k]=v;q(i,'t'+k).textContent=v;hl()}
  else if(a==='adj'){const c=A.rows[i]['c'+k],base=c==null?S.defTemp:c;setC(i,k,Math.min(90,Math.max(60,base+Number(b.dataset.v))))}
- else if(a==='fix'){A.rows[i].fix=b.dataset.t;q(i,'fix').value=b.dataset.t}
+ else if(a==='fix'){A.rows[i].fix=b.dataset.t;q(i,'fix').value=b.dataset.t;hl()}
  else if(a==='yest'){
   const p=A.k.split('-').map(Number),pd=new Date(p[0],p[1],p[2]-1),pr=S.data[dk(pd.getFullYear(),pd.getMonth(),pd.getDate())];
   if(!pr||!pr.foods||!pr.foods.length){dlg('Včera nic není','Ze včerejšího dne nejsou žádná jídla.',[{t:'Zavřít',p:1}]);return}
@@ -327,7 +341,7 @@ $('sb').addEventListener('click',e=>{
 });
 $('sb').addEventListener('input',e=>{
  const t=e.target,f=t.dataset.f;if(!f)return;
- if(f==='staff'){A.staff=t.value;return}
+ if(f==='staff'){A.staff=t.value;hl();return}
  const i=+t.dataset.r;
  if(f==='c1'||f==='c2'){setC(i,f[1],+t.value);return}
  A.rows[i][f]=t.value;
@@ -337,14 +351,55 @@ $('sb').addEventListener('input',e=>{
   dd.innerHTML=m.map(c=>'<div data-pick="'+esc(c)+'" data-r="'+i+'">'+esc(c)+'</div>').join('');
   dd.hidden=!m.length;
  }
- if(f==='fix')$('rc'+i).classList.toggle('low',lowAny(A.rows[i]));
+ if(f==='fix')$('rc'+i).classList.toggle('low',lowAny(A.rows[i]));hl();
 });
 $('sb').addEventListener('change',e=>{
  const t=e.target,f=t.dataset.f;if(!f)return;
- if(f==='staff'){A.staff=t.value;return}
+ if(f==='staff'){A.staff=t.value;hl();return}
  if(f==='t1'||f==='t2'){const i=+t.dataset.r,v=normT(t.value);t.value=v;A.rows[i][f]=v}
 });
 document.addEventListener('click',e=>{if(!e.target.closest('.acw'))document.querySelectorAll('.ac').forEach(x=>x.hidden=true)});
+
+/* time wheel */
+let TP=null;
+$('wh').innerHTML=Array.from({length:24},(_,i)=>'<div>'+pad(i)+'</div>').join('');
+$('wm').innerHTML=Array.from({length:60},(_,i)=>'<div>'+pad(i)+'</div>').join('');
+function openTp(i,k){
+ const m=/^(\d{1,2}):(\d{2})$/.exec(A.rows[i]['t'+k]||'');
+ TP={i,k};$('tpt').textContent=(k==2?'Čas 2':'Čas')+' – jídlo '+(i+1);
+ $('tp').classList.add('on');
+ $('wh').scrollTop=(m?+m[1]:new Date().getHours())*40;
+ $('wm').scrollTop=(m?+m[2]:0)*40;
+}
+const wv=(el,mx)=>Math.min(mx,Math.max(0,Math.round(el.scrollTop/40)));
+$('tpn').onclick=()=>{const n=new Date();$('wh').scrollTop=n.getHours()*40;$('wm').scrollTop=n.getMinutes()*40};
+$('tpc').onclick=()=>{$('tp').classList.remove('on');TP=null};
+$('tpo').onclick=()=>{
+ if(!TP||!A)return;
+ const v=pad(wv($('wh'),23))+':'+pad(wv($('wm'),59));
+ A.rows[TP.i]['t'+TP.k]=v;q(TP.i,'t'+TP.k).textContent=v;
+ $('tp').classList.remove('on');TP=null;hl();
+};
+
+/* highlight of required fields (after a failed save) */
+const isEmpty=r=>!r.name.trim()&&!r.t1&&!r.t2&&r.c1==null&&r.c2==null&&!r.fix.trim();
+function hl(){
+ if(!A||!A.hl)return;
+ const sb=$('sb'),st=sb.querySelector('[data-f="staff"]');
+ if(st)st.classList.toggle('req',!A.staff);
+ const allEmpty=A.rows.every(isEmpty);let anyName=false;
+ A.rows.forEach((r,i)=>{
+  const act=!isEmpty(r)||(i===0&&allEmpty);
+  const mark=(e,on)=>{if(e)e.classList.toggle('req',act&&on)};
+  mark(q(i,'name'),!r.name.trim());
+  mark(q(i,'t1'),!validT(r.t1));mark(q(i,'t2'),!validT(r.t2));
+  mark($('tv1_'+i),r.c1==null);mark($('tv2_'+i),r.c2==null);
+  mark(q(i,'fix'),lowAny(r)&&!r.fix.trim());
+  if(r.name.trim())anyName=true;
+ });
+ const ab=sb.querySelector('[data-a="add"]');
+ if(ab)ab.classList.toggle('req',!anyName);
+}
 
 /* validation and save */
 function check(){
@@ -368,7 +423,8 @@ function check(){
 function trySave(){
  const{issues,clean}=check();
  if(issues.length){
-  dlg('Něco chybí','<ul>'+issues.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ul>',[{t:'Uložit rozpracované',f:()=>saveDay(true)},{t:'Zpět a doplnit',p:1}]);
+  A.hl=true;hl();
+  dlg('Něco chybí','<ul>'+issues.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ul>',[{t:'Uložit rozpracované',f:()=>saveDay(true)},{t:'Zpět a doplnit',c:'warn',f:()=>{const x=$('sb').querySelector('.req');if(x)x.scrollIntoView({block:'center'})}}]);
   return;
  }
  const sm=clean.map(r=>'<li><b>'+esc(r.name.trim())+'</b>: '+r.t1+' – '+r.c1+' °C, '+r.t2+' – '+r.c2+' °C'+(lowAny(r)?' (náprava: '+esc(r.fix.trim())+')':'')+'</li>').join('');
